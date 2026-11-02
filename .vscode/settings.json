@@ -3,5 +3,8 @@
     "luau-lsp.sourcemap.enabled": false,
     "luau-lsp.studioPlugin.enabled": false,
     "luau-lsp.fflags.enableNewSolver": true,
-    "luau-lsp.fflags.override": { "LuauSolverV2": "true" }
+    "luau-lsp.fflags.override": { "LuauSolverV2": "true" },
+    "[luau]": {
+        "editor.formatOnSave": true
+    }
 }
