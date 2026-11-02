@@ -1,0 +1,7 @@
+{
+    "luau-lsp.platform.type": "standard",
+    "luau-lsp.sourcemap.enabled": false,
+    "luau-lsp.studioPlugin.enabled": false,
+    "luau-lsp.fflags.enableNewSolver": true,
+    "luau-lsp.fflags.override": { "LuauSolverV2": "true" }
+}

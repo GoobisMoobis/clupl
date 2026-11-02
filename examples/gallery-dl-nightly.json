@@ -1,0 +1,10 @@
+{
+	"$schema": "https://raw.githubusercontent.com/GoobisMoobis/clupl/main/package.schema.json",
+	"name": "gallery-dl",
+	"description": "gallery-dl nightly builds, made from its newest commit every day",
+	"repository": "https://github.com/gdl-org/builds",
+	"asset": "gallery-dl_linux",
+	"install": [
+		{ "source": ".", "target": "~/.local/bin/gallery-dl" }
+	]
+}

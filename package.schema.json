@@ -1,0 +1,159 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/GoobisMoobis/clupl/package.schema.json",
+	"title": "CLUPL package",
+	"description": "A package definition installed with `clupl install`. Only `repository` is required; everything else is optional and gets filled in by `clupl install` when it copies the file into CLUPL's managed directory. Install downloads the asset, extracts it into the package directory (~/.local/share/clupl/packages/<name>/files/, next to the managed package.json), deletes anything matched by `exclude`, then links or copies the `install` entries out of it.",
+	"type": "object",
+	"required": ["repository"],
+	"additionalProperties": false,
+	"properties": {
+		"$schema": {
+			"type": "string",
+			"description": "Optional, lets editors find this schema. I'd assume this is how you're using the schema, but who knows, really?"
+		},
+		"clupl": {
+			"type": "string",
+			"description": "The version of CLUPL that this package file was made for or installed with. Ex. \"1.0.0\"",
+			"pattern": "^\\d+\\.\\d+\\.\\d+$"
+		},
+		"repository": {
+			"type": "string",
+			"description": "The URL the package is fetched from, such as https://github.com/owner/repo or https://codeberg.org/owner/repo.",
+			"format": "uri",
+			"pattern": "^https://[^/]+/[^/]+/[^/]+/?$"
+		},
+		"platform": {
+			"description": "Which kind of site the repository is on. \"forgejo\" covers Codeberg and any other Forgejo or Gitea site. This is not needed, but is recommended for clarity. If not included it is inferred from the URL",
+			"enum": ["github", "forgejo"]
+		},
+		"name": {
+			"type": "string",
+			"description": "A unique package name. Created based on the repository name if left blank.",
+			"pattern": "^[a-z0-9][a-z0-9._-]*$"
+		},
+		"description": {
+			"type": "string",
+			"description": "Single line description for the package. Created from the repository's description if left blank."
+		},
+		"asset": {
+			"type": "string",
+			"description": "Glob matched against release asset file names, e.g. \"*-x86_64-linux.tar.gz\". If left out, install picks the asset that matches Linux and the current architecture, and asks if more than one matches. The chosen asset's name is saved here with the version replaced by *.",
+			"minLength": 1
+		},
+		"prerelease": {
+			"type": "boolean",
+			"description": "Whether prereleases (betas, nightlies) should be counted when looking for the latest version of installed packages. CLUPL's `-prerelease` flag sets it to true.",
+			"default": false
+		},
+		"archive": {
+			"description": "How to unpack the asset. \"auto\" goes by the file extension, or starting bytes. \"none\" means the asset is the file itself (e.g. a binary or AppImage).",
+			"enum": ["auto", "none", "zip", "tar", "tar.gz", "tar.xz", "tar.bz2", "tar.zst", "gz", "xz", "bz2", "zst"],
+			"default": "auto"
+		},
+		"strip": {
+			"type": "integer",
+			"description": "Works similar to `tar --strip-components`. If left out, a single top-level folder wrapping everything (e.g. ripgrep-14.1.0-x86_64-unknown-linux-musl/) is stripped automatically, and nothing is stripped otherwise.",
+			"minimum": 0
+		},
+		"exclude": {
+			"type": "array",
+			"description": "Globs, relative to the extracted (and stripped) archive, that are deleted after extracting, e.g. [\"*.md\", \"LICENSE*\", \"doc\"]. Matches work like a .gitignore, so if you don't include a / the glob matches by name at any depth. Nothing is deleted if left out.",
+			"items": { "type": "string", "minLength": 1 },
+			"uniqueItems": true
+		},
+		"install": {
+			"type": "array",
+			"description": "What to put on the system from the extracted package. Each entry is either a glob string or an object. If left out, install finds every executable file in the package (except shared libraries) and puts each one at ~/.local/bin/<file name>, listing them for confirmation first. A single binary or AppImage is installed as ~/.local/bin/<name>. The generated list is saved.",
+			"minItems": 1,
+			"items": {
+				"oneOf": [
+					{ "type": "string", "minLength": 1 },
+					{ "$ref": "#/$defs/installEntry" }
+				]
+			}
+		},
+		"desktop": {
+			"type": "array",
+			"description": "App menu entries. CLUPL writes a .desktop file for each one to ~/.local/share/applications (clupl-<name>.desktop for the first, clupl-<name>-<entry name>.desktop for the rest).",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["name", "exec"],
+				"additionalProperties": false,
+				"properties": {
+					"name": { "type": "string", "minLength": 1, "description": "The name shown in the app menu." },
+					"exec": { "type": "string", "minLength": 1, "description": "The program to run, a path inside the downloaded files like \"thorium\" or \"bin/tool\". \".\" is the download itself when it isn't an archive." },
+					"arguments": { "type": "string", "minLength": 1, "description": "Added after the program, e.g. \"%U\" to pass the links or files it was opened with. See the Exec key in the Desktop Entry Specification." },
+					"icon": { "type": "string", "minLength": 1, "description": "A path inside the downloaded files, or the name of an icon from the icon theme (e.g. one installed to ~/.local/share/icons/hicolor)." },
+					"comment": { "type": "string", "minLength": 1, "description": "A short description, shown as a tooltip by most desktops." },
+					"categories": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Where in the app menu it goes, e.g. [\"Network\", \"WebBrowser\"]." },
+					"mimeTypes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "File and link types it can open, e.g. [\"text/html\", \"x-scheme-handler/https\"]." },
+					"terminal": { "type": "boolean", "default": false, "description": "Run it in a terminal, for command line programs." },
+					"windowClass": { "type": "string", "minLength": 1, "description": "The window class of the program's windows (StartupWMClass), so the taskbar groups them under this entry." }
+				}
+			}
+		},
+		"setuid": {
+			"type": "array",
+			"description": "Paths inside the downloaded files that have to be owned by root, such as chrome-sandbox for Chromium browsers.",
+			"items": { "type": "string", "minLength": 1 }
+		},
+		"checksums": {
+			"description": "Where to find the checksums the download is checked against before it's unpacked. If left out, install looks for a checksums file in the release (like tool.tar.gz.sha256, checksums.txt or SHA256SUMS) and saves its name here with the version replaced by *. Set to false to turn checking off. GitHub's own checksum of the download is also checked whenever GitHub has one, unless this is false.",
+			"oneOf": [
+				{ "type": "string", "minLength": 1 },
+				{ "const": false }
+			]
+		},
+		"hold": {
+			"type": "boolean",
+			"description": "true keeps `clupl package update` from changing this package.",
+			"default": false
+		},
+		"version": {
+			"type": "string",
+			"readOnly": true,
+			"description": "Written by install: the release tag that is currently installed. Not meant to be set by hand."
+		},
+		"released": {
+			"type": "string",
+			"readOnly": true,
+			"description": "Written by install: when the installed release was published. Nightlies often reuse one tag (like \"nightly\") for every build, so this is how updates to them are found. Not meant to be set by hand."
+		},
+		"installed": {
+			"type": "array",
+			"readOnly": true,
+			"description": "Written by install: every path it created outside the package directory, so `clupl remove` and updates can clean them up. Not meant to be set by hand.",
+			"items": { "type": "string" },
+			"uniqueItems": true
+		}
+	},
+	"$defs": {
+		"installEntry": {
+			"type": "object",
+			"required": ["source"],
+			"additionalProperties": false,
+			"properties": {
+				"source": {
+					"type": "string",
+					"description": "Glob relative to the extracted package. It can match one file, several files, or a folder (installed with everything inside it). \".\" means the asset itself when it is a bare or single compressed file, and the whole extracted folder otherwise.",
+					"minLength": 1
+				},
+				"target": {
+					"type": "string",
+					"description": "Where to install. May start with ~ for the user's home directory. A path ending in / is a folder that every match goes into; otherwise it is the exact path for a single match (so a binary can be renamed). Defaults to ~/.local/bin/ for executables and to ~/.local/share/<name>/ for everything else.",
+					"pattern": "^(/|~/)"
+				},
+				"mode": {
+					"description": "\"link\" puts a symlink at the target pointing into the package directory, so binaries keep working next to their bundled libraries and data. \"copy\" copies the files instead, for things that must be real files (e.g. some .desktop files or configs read by other programs).",
+					"enum": ["link", "copy"],
+					"default": "link"
+				},
+				"executable": {
+					"type": "boolean",
+					"description": "Mark matched files as executable. If left out, files that are already executable or are ELF binaries are marked, and others are left alone."
+				}
+			}
+		}
+	}
+}

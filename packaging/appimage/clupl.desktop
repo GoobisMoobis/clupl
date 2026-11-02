@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment={{summary}}
+Exec={{name}}
+Icon={{name}}
+Terminal=true
+Categories=Utility;

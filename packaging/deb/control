@@ -1,0 +1,12 @@
+Package: {{name}}
+Version: {{version}}
+Architecture: {{debianArch}}
+Maintainer: {{owner}} <{{owner}}@users.noreply.github.com>
+Installed-Size: {{installedSize}}
+Depends: {{depends}}
+Recommends: {{recommends}}
+Section: utils
+Priority: optional
+Homepage: {{homepage}}
+Description: {{summary}}
+ {{description}}

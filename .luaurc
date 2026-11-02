@@ -1,0 +1,10 @@
+{
+    "aliases": {
+        "std": "./.lute/typedefs/current/std",
+        "lute": "./.lute/typedefs/current/lute",
+        "lint": "./.lute/typedefs/current/lint",
+        "batteries": "./vendor/batteries",
+        "utilities": "./utilities",
+        "commands": "./commands"
+    }
+}

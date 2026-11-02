@@ -1,0 +1,9 @@
+{
+	"$schema": "https://raw.githubusercontent.com/GoobisMoobis/clupl/main/package.schema.json",
+	"name": "lute",
+	"description": "A standalone Luau runtime for general-purpose programming",
+	"repository": "https://github.com/luau-lang/lute",
+	"install": [
+		{ "source": "lute" }
+	]
+}

@@ -1,0 +1,49 @@
+{
+	"$schema": "https://raw.githubusercontent.com/GoobisMoobis/clupl/main/package.schema.json",
+	"clupl": "0.1.0",
+	"name": "thorium",
+	"description": "Thorium, a Chromium fork tuned for speed. Beta builds from gz83's repository while Alex313031 is away. AVX2 build",
+	"repository": "https://github.com/gz83/thorium",
+	"asset": "thorium-browser_*_AVX2.zip",
+	"prerelease": true,
+	"exclude": [
+		"THORIUM-PORTABLE",
+		"thorium-portable.desktop.example",
+		"THORIUM-SHELL",
+		"thorium-shell.desktop.example",
+		"thorium_shell",
+		"thorium_shell.png",
+		"chromedriver"
+	],
+	"install": [
+		{ "source": "thorium", "target": "~/.local/bin/thorium-browser" },
+		{ "source": "thorium.svg", "target": "~/.local/share/icons/hicolor/scalable/apps/thorium-browser.svg" },
+		{ "source": "product_logo_256.png", "target": "~/.local/share/icons/hicolor/256x256/apps/thorium-browser.png" },
+		{ "source": "product_logo_128.png", "target": "~/.local/share/icons/hicolor/128x128/apps/thorium-browser.png" },
+		{ "source": "product_logo_64.png", "target": "~/.local/share/icons/hicolor/64x64/apps/thorium-browser.png" },
+		{ "source": "product_logo_48.png", "target": "~/.local/share/icons/hicolor/48x48/apps/thorium-browser.png" },
+		{ "source": "product_logo_32.png", "target": "~/.local/share/icons/hicolor/32x32/apps/thorium-browser.png" },
+		{ "source": "product_logo_24.png", "target": "~/.local/share/icons/hicolor/24x24/apps/thorium-browser.png" },
+		{ "source": "product_logo_16.png", "target": "~/.local/share/icons/hicolor/16x16/apps/thorium-browser.png" }
+	],
+	"desktop": [
+		{
+			"name": "Thorium Browser",
+			"comment": "Access the Internet",
+			"exec": "thorium",
+			"arguments": "--class=thorium-browser %U",
+			"icon": "thorium-browser",
+			"categories": ["Network", "WebBrowser"],
+			"mimeTypes": [
+				"text/html",
+				"text/xml",
+				"application/xhtml+xml",
+				"application/pdf",
+				"x-scheme-handler/http",
+				"x-scheme-handler/https"
+			],
+			"windowClass": "thorium-browser"
+		}
+	],
+	"setuid": ["chrome-sandbox"]
+}
