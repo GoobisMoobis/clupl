@@ -5,21 +5,25 @@ otherwise there would be a circular require and the program wouldn't run
 
 local cli = require("@batteries/cli")
 
--- a subcommand, e.g. the install in clupl install
 export type Command = {
-	-- matched against the first CLI argument
 	name: string,
-	-- one line, shown in both clupl --help and clupl <name> --help
+	-- A one line description used when clupl requests more information about the command
 	description: string,
 	-- registers the command's arguments on the parser
 	setup: ((parser: cli.Parser) -> ())?,
-	-- optional hook to rewrite the raw args in place before they are parsed,
-	-- for syntax batteries can't handle on its own. --flag=value is already split by then
+	--[[
+	hook to rewrite raw args before they are parsed,
+	for syntax that batteries' cli module can't handle on its own.
+	Note that the --flag=value syntax has already been split by this point.
+	]]
 	prepare: ((args: { string }) -> ())?,
-	-- runs after parsing succeeds, so required arguments are guaranteed to be set
+	-- runs after parsing succeeds
 	run: ((parser: cli.Parser) -> ())?,
-	-- commands of its own, e.g. the list in clupl package list. a command with
-	-- subcommands leaves out setup, prepare and run, since the subcommand does the work
+	--[[
+	commands of its own!
+	command with subcommands leave out setup,
+	prepare and run, since the subcommand does the work
+	]]
 	subcommands: { Command }?,
 }
 
