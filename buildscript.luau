@@ -35,16 +35,16 @@ local checksums = require("@utilities/checksums")
 local files = require("@utilities/files")
 local releases = require("@utilities/releases")
 
--- this file is in the root of the repository, so its folder is the repository
 local ROOT = path.format(path.resolve(files.parent(process.args[1]) or "."))
 local BUILD = ROOT .. "/build"
 local STAGE = BUILD .. "/stage"
 local PACKAGING = ROOT .. "/packaging"
 
--- the files and folders clupl's source is made of
+-- the files and folders clupl is made from
 local SOURCE = { "main.luau", "manifest.luau", ".luaurc", "commands", "utilities", "vendor" }
 
 -- the tool each format needs
+-- more on this in CONTRIBUTING.md
 local TOOLS: { [string]: string } = {
 	appimage = "appimagetool",
 	deb = "dpkg-deb",
@@ -55,7 +55,7 @@ local TOOLS: { [string]: string } = {
 local VERSION = manifest.version
 local ARCH = releases.arch()
 
--- the same lute that's running this script
+-- the lute executable that is running buildscript.luau
 local LUTE = path.format(process.execPath())
 
 local function step(message: string)
@@ -63,8 +63,7 @@ local function step(message: string)
 end
 
 --[[
-fills in every {{word}} in a packaging file. a word the values don't have is an error,
-so a typo in a packaging file can't quietly end up in a package
+replaces {{word}} placeholders with actual values
 ]]
 local function fillTemplate(templatePath: string, values: { [string]: string }): string
 	local text = fs.readFileToString(templatePath)
@@ -93,7 +92,7 @@ local function templateValues(): { [string]: string }
 	}
 end
 
--- "a b c" -> "'a' 'b' 'c'", the way PKGBUILD lists are written
+-- "a b c" -> "'a' 'b' 'c'", mainly for Arch's PKGBUILD file
 local function quotedList(items: { string }): string
 	local quoted = {}
 	for _, item in items do
@@ -108,12 +107,11 @@ local function trimEnd(text: string): string
 	return trimmed
 end
 
--- adds the comments around a token to the list. seen stops a comment from being added twice
 local function addComments(token: syntax.CstToken, comments: { syntax.Trivia }, seen: { [string]: boolean })
 	for _, trivia in { token.leadingTrivia, token.trailingTrivia } do
 		for _, item in trivia do
 			local place = `{item.location.beginLine}:{item.location.beginColumn}`
-			-- --!strict, --!native and the like change how luau runs the file, so they stay
+			-- keeps things like --!strict
 			local isDirective = string.sub(item.text, 1, 3) == "--!"
 
 			if item.tag ~= "whitespace" and not isDirective and not seen[place] then
@@ -125,9 +123,8 @@ local function addComments(token: syntax.CstToken, comments: { syntax.Trivia }, 
 end
 
 --[[
-takes the comments out of luau source. lute's own parser finds them, so a "--" inside a
-string is never mistaken for a comment. every line stays where it was (a removed comment
-leaves an empty line), so line numbers in error messages still match the real source
+Uses the above function to go through and trim comments from
+ever source file for the appimage version of CLUPL
 ]]
 local function stripComments(source: string): string
 	local result = parser.parse(source)
@@ -143,7 +140,6 @@ local function stripComments(source: string): string
 	-- comments at the very end of a file belong to the end-of-file token
 	addComments(result.eof, comments, seen)
 
-	-- last comment first, so removing one never moves the columns of the ones still to do
 	table.sort(comments, function(a: syntax.Trivia, b: syntax.Trivia): boolean
 		if a.location.beginLine ~= b.location.beginLine then
 			return a.location.beginLine > b.location.beginLine
@@ -154,18 +150,14 @@ local function stripComments(source: string): string
 	local lines = string.split(source, "\n")
 	for _, comment in comments do
 		local span = comment.location
-		-- columns count bytes from 1, and endColumn is the first byte after the comment
 		local before = string.sub(lines[span.beginLine], 1, span.beginColumn - 1)
 		local after = string.sub(lines[span.endLine], span.endColumn)
 
 		if span.beginLine == span.endLine and trimEnd(after) ~= "" then
-			-- code on both sides, like a --[[ ]] comment in the middle of a line.
-			-- the space keeps the code on either side from joining into one word
 			lines[span.beginLine] = before .. " " .. after
 		elseif span.beginLine == span.endLine then
 			lines[span.beginLine] = trimEnd(before)
 		else
-			-- a --[[ ]] comment over several lines: its lines are kept, but empty
 			lines[span.beginLine] = trimEnd(before)
 			for line = span.beginLine + 1, span.endLine - 1 do
 				lines[line] = ""
@@ -177,7 +169,6 @@ local function stripComments(source: string): string
 	return table.concat(lines, "\n")
 end
 
--- strips the comments from every .luau file inside folder
 local function stripFolder(folder: string)
 	files.walk(folder, function(relative: string, kind: string): boolean
 		if kind == "file" and string.sub(relative, -5) == ".luau" then
@@ -189,8 +180,7 @@ local function stripFolder(folder: string)
 end
 
 --[[
-copies clupl's source into destination, marked as built for `format` (see utilities/buildinfo.luau).
-the copy has no comments, which only matter to people reading the code in the repository
+copies source into a target destination, marked as built for format (see utilities/buildinfo.luau).
 ]]
 local function copySource(destination: string, format: string)
 	files.makeFolder(destination)
@@ -199,21 +189,24 @@ local function copySource(destination: string, format: string)
 	end
 	stripFolder(destination)
 
-	files.write(destination .. "/utilities/buildinfo.luau", `return \{\n\tformat = "{format}",\n}\n`)
+	local runtimeVersion = uts.run({ LUTE, "--version" })
+	local formattedRuntimeVersion = `\tlute = "{runtimeVersion}",\n`
+
+	files.write(
+		destination .. "/utilities/buildinfo.luau",
+		`return \{\n\tformat = "{format}",{if format ~= "appimage" then formattedRuntimeVersion else ""}\n}\n`
+	)
 end
 
 --[[
-makes sure a compiled program still works when it's run by name, the way an installed program
-is run. Lute 1.0.0 has a bug where a compiled program finds its own code using the name it
-was started with, so started as just "clupl" (found through PATH) it looks for ./clupl in the
-current folder, doesn't find it, and acts like plain lute. Lute's nightly builds fix this.
-it's run from an empty folder, so there's no ./clupl to find by accident
+Read about this in CONTRIBUTING.md
+essentially, this prevents CLUPL from being built with
+any Lute version below a prerelease of 1.0.1
 ]]
 local function checkRunsByName(program: string)
 	local emptyFolder = STAGE .. "/empty"
 	files.makeFolder(emptyFolder)
 
-	-- $1 is the folder to run from, $2 the folder the program is in
 	local script = 'cd "$1" && PATH="$2:$PATH" clupl --help'
 	local output = uts.run({ "sh", "-c", script, "sh", emptyFolder, files.parent(program) or "." })
 
@@ -227,7 +220,7 @@ local function checkRunsByName(program: string)
 	end
 end
 
--- compiles a copy of the source marked as `format` and returns the path of the program
+-- compiles a copy of source and returns the path of the resulting binary
 local function compile(format: string): string
 	local source = `{STAGE}/{format}/source`
 	copySource(source, format)
@@ -239,7 +232,7 @@ local function compile(format: string): string
 	return program
 end
 
--- size of a file in KiB, rounded up, which is how Debian measures Installed-Size
+-- size of a file in KiB, rounded up.
 local function sizeInKiB(filePath: string): number
 	return math.ceil(fs.metadata(filePath).size / 1024)
 end
@@ -263,7 +256,7 @@ function builders.appimage(): string
 	files.makeExecutable(appDir .. "/AppRun")
 
 	local output = BUILD .. "/" .. releases.fileName("appimage", VERSION, ARCH)
-	-- --no-appstream skips checking for AppStream metadata, which clupl doesn't have
+	-- --no-appstream skips checking for AppStream metadata, which CLUPL doesn't have
 	uts.run({ "appimagetool", "--no-appstream", appDir, output }, nil, { ARCH = ARCH })
 	return output
 end
@@ -290,7 +283,7 @@ function builders.deb(): string
 	files.write(root .. "/DEBIAN/control", fillTemplate(PACKAGING .. "/deb/control", values))
 
 	local output = BUILD .. "/" .. releases.fileName("deb", VERSION, ARCH)
-	-- --root-owner-group makes every file owned by root in the package, whoever built it
+	-- --root-owner-group makes every file owned by root in the package
 	uts.run({ "dpkg-deb", "--build", "--root-owner-group", root, output })
 	return output
 end
@@ -334,8 +327,6 @@ function builders.arch(): string
 	values.recommends = quotedList(manifest.recommends.arch)
 	files.write(folder .. "/PKGBUILD", fillTemplate(PACKAGING .. "/arch/PKGBUILD", values))
 
-	-- makepkg reads settings from the builder's makepkg.conf, which could put the package
-	-- somewhere else or compress it differently, so the ones that matter are set here
 	uts.run({ "makepkg", "--force", "--nodeps", "--noconfirm" }, folder, {
 		PKGDEST = folder,
 		SRCDEST = folder,
@@ -349,7 +340,7 @@ function builders.arch(): string
 	return output
 end
 
--- the formats asked for on the command line, or every format
+-- the formats passed in on the command line, or every format if none
 local function chosenFormats(): { string }
 	local chosen = { table.unpack(process.args, 2) }
 	if #chosen == 0 then
@@ -375,7 +366,6 @@ local function main()
 	local formats = chosenFormats()
 	print(richterm.bold(`Building {manifest.name} {VERSION} for {ARCH}`))
 
-	-- a clean build folder every time, so nothing from an older build gets uploaded by mistake
 	files.remove(BUILD)
 	files.makeFolder(STAGE)
 
@@ -400,7 +390,6 @@ local function main()
 		end
 	end
 
-	-- one checksum per built file, in the same layout sha256sum uses, so clupl can check its own downloads
 	local lines = {}
 	for _, output in built do
 		table.insert(lines, `{checksums.sha256(output)}  {files.basename(output)}`)
@@ -409,10 +398,10 @@ local function main()
 		files.write(BUILD .. "/SHA256SUMS", table.concat(lines, "\n") .. "\n")
 	end
 
-	-- not for uploading: lets clupl update test this folder as if it were a release (see utilities/selfupdate.luau)
+	-- not for uploading
 	files.write(BUILD .. "/VERSION", VERSION .. "\n")
 
-	-- the stage folder is only for building, keeping it would just get in the way of uploading
+	-- the stage folder is only for building
 	files.remove(STAGE)
 
 	print()

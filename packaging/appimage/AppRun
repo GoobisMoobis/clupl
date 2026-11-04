@@ -1,0 +1,12 @@
+#!/bin/sh
+# Invoked when running the .AppImage file
+# If you don't know how AppImages work it's very cool, look it up
+
+here="$(dirname "$(readlink -f "$0")")"
+
+if ! command -v lute >/dev/null 2>&1; then
+	echo "The AppImage version of CLUPL needs Lute installed: https://lute.luau.org/guide/installation.html" >&2
+	exit 1
+fi
+
+exec lute run "$here/usr/share/clupl/main.luau" "$@"
